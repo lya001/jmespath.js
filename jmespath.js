@@ -182,6 +182,10 @@
   var TOK_LBRACKET = "Lbracket";
   var TOK_LPAREN= "Lparen";
   var TOK_LITERAL= "Literal";
+  var TOK_PLUS = "Plus";
+  var TOK_MINUS = "Minus";
+  var TOK_MULTIPLY = "Multiply";
+  var TOK_DIVIDE = "Divide";
 
   // The "&", "[", "<", ">" tokens
   // are not in basicToken because
@@ -199,7 +203,11 @@
     "]": TOK_RBRACKET,
     "(": TOK_LPAREN,
     ")": TOK_RPAREN,
-    "@": TOK_CURRENT
+    "@": TOK_CURRENT,
+    "+": TOK_PLUS,
+    "\u2212": TOK_MINUS,
+    "\u00d7": TOK_MULTIPLY,
+    "/": TOK_DIVIDE
   };
 
   var operatorStartToken = {
@@ -254,6 +262,15 @@
                               value: stream[this._current],
                               start: this._current});
                   this._current++;
+              } else if (stream[this._current] === "-") {
+                if ((this._current + 1 < stream.length) && isNum(stream[this._current + 1])) {
+                  token = this._consumeNumber(stream);
+                  tokens.push(token);
+                } else {
+                  start = this._current;
+                  this._current++;
+                  tokens.push({type: TOK_MINUS, value: "-", start: start});
+                }
               } else if (isNum(stream[this._current])) {
                   token = this._consumeNumber(stream);
                   tokens.push(token);
@@ -491,6 +508,10 @@
       bindingPower[TOK_GTE] = 5;
       bindingPower[TOK_LTE] = 5;
       bindingPower[TOK_NE] = 5;
+      bindingPower[TOK_PLUS] = 6;
+      bindingPower[TOK_MINUS] = 6;
+      bindingPower[TOK_MULTIPLY] = 7;
+      bindingPower[TOK_DIVIDE] = 7;
       bindingPower[TOK_FLATTEN] = 9;
       bindingPower[TOK_STAR] = 20;
       bindingPower[TOK_FILTER] = 21;
@@ -568,6 +589,12 @@
           case TOK_NOT:
             right = this.expression(bindingPower.Not);
             return {type: "NotExpression", children: [right]};
+          case TOK_MINUS:
+            right = this.expression(bindingPower.Minus);
+            return {type: "Unary", name: token.type, children: [right]};
+          case TOK_PLUS:
+            right = this.expression(bindingPower.Plus);
+            return {type: "Unary", name: token.type, children: [right]};
           case TOK_STAR:
             left = {type: "Identity"};
             right = null;
@@ -684,6 +711,12 @@
           case TOK_LT:
           case TOK_LTE:
             return this._parseComparator(left, tokenName);
+          case TOK_PLUS:
+          case TOK_MINUS:
+          case TOK_MULTIPLY:
+          case TOK_STAR:
+          case TOK_DIVIDE:
+            return this._parseArithmetic(left, tokenName);
           case TOK_LBRACKET:
             var token = this._lookaheadToken(0);
             if (token.type === TOK_NUMBER || token.type === TOK_COLON) {
@@ -776,6 +809,11 @@
       _parseComparator: function(left, comparator) {
         var right = this.expression(bindingPower[comparator]);
         return {type: "Comparator", name: comparator, children: [left, right]};
+      },
+
+      _parseArithmetic: function(left, operator) {
+        var right = this.expression(bindingPower[operator]);
+        return {type: "Arithmetic", name: operator, children: [left, right]};
       },
 
       _parseDotRHS: function(rbp) {
@@ -974,6 +1012,44 @@
                 }
               }
               return finalResults;
+            case "Arithmetic":
+              console.log(node);
+              console.log(node.children[0]);
+              console.log(node.children[1]);
+              first = this.visit(node.children[0], value);
+              second = this.visit(node.children[1], value);
+              switch(node.name) {
+                case TOK_PLUS:
+                  result = first + second;
+                  break;
+                case TOK_MINUS:
+                  result = first - second;
+                  break;
+                case TOK_MULTIPLY:
+                case TOK_STAR:
+                  result = first * second;
+                  break;
+                case TOK_DIVIDE:
+                  result = first / second;
+                  break;
+                default:
+                  throw new Error("Unknown arithmetic operator: " + node.name);
+              }
+              return result;
+            case "Unary":
+              console.log(node.children[0]);
+              right = this.visit(node.children[0], value);
+              switch(node.name) {
+                case TOK_PLUS:
+                  result = right;
+                  break;
+                case TOK_MINUS:
+                  result = -right;
+                  break;
+                default:
+                  throw new Error("Unknown arithmetic operator: " + node.name);
+              }
+              return result;
             case "Comparator":
               first = this.visit(node.children[0], value);
               second = this.visit(node.children[1], value);
