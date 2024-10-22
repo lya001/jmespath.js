@@ -186,6 +186,7 @@
   var TOK_MINUS = "Minus";
   var TOK_MULTIPLY = "Multiply";
   var TOK_DIVIDE = "Divide";
+  var TOK_NULLCOALESCE = "Null-coalesce";
 
   // The "&", "[", "<", ">" tokens
   // are not in basicToken because
@@ -311,6 +312,10 @@
                   } else {
                       tokens.push({type: TOK_EXPREF, value: "&", start: start});
                   }
+              } else if ((stream[this._current] === "?") && (stream[this._current + 1] === "?")) {
+                  start = this._current;
+                  this._current += 2;
+                  tokens.push({type: TOK_NULLCOALESCE, value: "??", start: start});
               } else if (stream[this._current] === "|") {
                   start = this._current;
                   this._current++;
@@ -500,6 +505,7 @@
       bindingPower[TOK_CURRENT] = 0;
       bindingPower[TOK_EXPREF] = 0;
       bindingPower[TOK_PIPE] = 1;
+      bindingPower[TOK_NULLCOALESCE] = 1;
       bindingPower[TOK_OR] = 2;
       bindingPower[TOK_AND] = 3;
       bindingPower[TOK_EQ] = 5;
@@ -727,6 +733,9 @@
             this._match(TOK_RBRACKET);
             right = this._parseProjectionRHS(bindingPower.Star);
             return {type: "Projection", children: [left, right]};
+          case TOK_NULLCOALESCE:
+            var right = this.expression(bindingPower[tokenName]);
+            return {type: "Null-coalesce", name: tokenName, children: [left, right]};
           default:
             this._errorToken(this._lookaheadToken(0));
         }
@@ -1013,9 +1022,6 @@
               }
               return finalResults;
             case "Arithmetic":
-              console.log(node);
-              console.log(node.children[0]);
-              console.log(node.children[1]);
               first = this.visit(node.children[0], value);
               second = this.visit(node.children[1], value);
               switch(node.name) {
@@ -1037,7 +1043,6 @@
               }
               return result;
             case "Unary":
-              console.log(node.children[0]);
               right = this.visit(node.children[0], value);
               switch(node.name) {
                 case TOK_PLUS:
@@ -1148,6 +1153,10 @@
               // checker verify the type.
               refNode.jmespathType = TOK_EXPREF;
               return refNode;
+            case "Null-coalesce":
+              left = this.visit(node.children[0], value);
+              right = this.visit(node.children[1], value);
+              return left ?? right;
             default:
               throw new Error("Unknown node type: " + node.type);
           }
