@@ -735,7 +735,7 @@
             return {type: "Projection", children: [left, right]};
           case TOK_NULLCOALESCE:
             var right = this.expression(bindingPower[tokenName]);
-            return {type: "Null-coalesce", name: tokenName, children: [left, right]};
+            return {type: "Null-coalesce", children: [left, right]};
           default:
             this._errorToken(this._lookaheadToken(0));
         }
