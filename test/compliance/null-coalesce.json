@@ -1,0 +1,36 @@
+[
+    {
+        "given": {
+            "a": {
+                "b": 1,
+                "c": false
+            },
+            "d": {
+                "e": 2,
+                "f": true
+            }
+        },
+        "cases": [
+            {
+                "expression": "b ?? a.b",
+                "result": 1.0
+            },
+            {
+                "expression": "d.e ?? d.f",
+                "result": 2.0
+            },
+            {
+                "expression": "b ?? c ?? a.c",
+                "result": false
+            },
+            {
+                "expression": "b ?? a.c || `false`",
+                "result": false
+            },
+            {
+                "expression": "a.c | @ ?? {a: `2`} | a",
+                "result": null
+            }
+        ]
+    }
+]
